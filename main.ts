@@ -73,6 +73,34 @@ export default class BlinkoSyncPlugin extends Plugin {
 		}
 	}
 
+	async syncArchivedNow(manual = true) {
+		if (!this.syncManager) {
+			return;
+		}
+
+		if (this.syncManager.syncing) {
+			if (manual) {
+				new Notice('Blinko sync already running. Please wait.');
+			}
+			return;
+		}
+
+		this.setStatusSyncing();
+		try {
+			const { newNotes, flashNotes } = await this.syncManager.startSyncArchived();
+			this.setStatusIdle(this.settings.lastSyncTime || undefined);
+			if (this.dailyNoteManager) {
+				await this.dailyNoteManager.insertFlashNotes(flashNotes);
+			}
+			new Notice(`Archived sync complete: ${newNotes} archived notes added.`);
+		} catch (error) {
+			this.setStatusIdle();
+			const reason = error instanceof Error ? error.message : 'Unknown error';
+			console.error('[Blinko Sync] Archived sync failed', error);
+			new Notice(`Archived sync failed: ${reason}`);
+		}
+	}
+
 	async checkDeletedNotes(manual = true) {
 		if (!this.deletionManager) {
 			return;
@@ -171,6 +199,14 @@ export default class BlinkoSyncPlugin extends Plugin {
 				name: 'Blinko: reconcile deletions',
 				callback: () => {
 					void this.checkDeletedNotes(true);
+				},
+			});
+
+			this.addCommand({
+				id: 'blinko-sync-archived',
+				name: 'Sync archived notes',
+				callback: () => {
+					void this.syncArchivedNow(true);
 				},
 			});
 
@@ -448,6 +484,32 @@ class BlinkoSettingTab extends PluginSettingTab {
 						void this.plugin.syncNow(true);
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName('Last archived sync time')
+			.setDesc(this.getLastArchivedSyncDescription())
+			.addExtraButton((button) =>
+				button
+					.setIcon('rotate-ccw')
+					.setTooltip('Reset last archived sync time')
+					.onClick(async () => {
+						this.plugin.settings.lastArchivedSyncTime = 0;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Sync archived notes')
+			.setDesc('Sync archived notes from Blinko')
+			.addButton((button) =>
+				button
+					.setButtonText('Sync archived notes')
+					.setCta()
+					.onClick(() => {
+						void this.plugin.syncArchivedNow(true);
+					}),
+			);
 	}
 
 	private renderAiTitleSettings(containerEl: HTMLElement) {
@@ -701,5 +763,13 @@ class BlinkoSettingTab extends PluginSettingTab {
 		}
 
 		return new Date(this.plugin.settings.lastSyncTime).toLocaleString();
+	}
+
+	private getLastArchivedSyncDescription() {
+		if (!this.plugin.settings.lastArchivedSyncTime) {
+			return 'Never synced';
+		}
+
+		return new Date(this.plugin.settings.lastArchivedSyncTime).toLocaleString();
 	}
 }

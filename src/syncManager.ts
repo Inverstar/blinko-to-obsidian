@@ -91,6 +91,61 @@ export class SyncManager {
 		}
 	}
 
+	async startSyncArchived(): Promise<SyncResult> {
+		if (this.isSyncing) {
+			this.log('Sync already running, skipping new request.');
+			return { newNotes: 0, flashNotes: [] };
+		}
+
+		if (!this.settings.serverUrl || !this.settings.accessToken) {
+			throw new Error('Configure the Blinko server URL and access token in settings before syncing.');
+		}
+
+		this.isSyncing = true;
+		const syncStartTime = Date.now();
+		const lastSyncTime = this.settings.lastArchivedSyncTime || 0;
+		let page = 1;
+		let hasMore = true;
+		let newNotes = 0;
+		const flashNotes: FlashNoteJournalEntry[] = [];
+
+		try {
+			while (hasMore) {
+				// eslint-disable-next-line no-await-in-loop
+				const notes = await this.client.getArchivedNotes(lastSyncTime, page, this.pageSize);
+				if (!notes.length) {
+					break;
+				}
+
+				for (const note of notes) {
+					// eslint-disable-next-line no-await-in-loop
+					const result = await this.handleNote(note, lastSyncTime);
+					if (!result.shouldContinue) {
+						hasMore = false;
+						break;
+					}
+
+					if (result.saveResult) {
+						newNotes += 1;
+						flashNotes.push(this.buildFlashSnapshot(note, result.saveResult));
+					}
+				}
+
+				if (!hasMore || notes.length < this.pageSize) {
+					break;
+				}
+
+				page += 1;
+			}
+
+			this.settings.lastArchivedSyncTime = syncStartTime;
+			await this.persistSettings();
+			return { newNotes, flashNotes };
+		} finally {
+			this.isSyncing = false;
+		}
+	}
+
 	private async handleNote(note: BlinkoNote, lastSyncTime: number): Promise<HandleNoteResult> {
 		const updatedTime = Date.parse(note.updatedAt);
 		if (Number.isFinite(updatedTime) && lastSyncTime && updatedTime <= lastSyncTime) {

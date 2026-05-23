@@ -8,6 +8,7 @@ interface NoteListParams {
 	orderBy: 'desc' | 'asc';
 	isRecycle: boolean;
 	type: number;
+	isArchived?: boolean;
 }
 
 export class BlinkoClient {
@@ -25,6 +26,33 @@ export class BlinkoClient {
 			orderBy: 'desc',
 			isRecycle: false,
 			type: -1,
+		};
+
+		const response = await requestUrl({
+			url,
+			method: 'POST',
+			headers: this.buildHeaders(true),
+			body: JSON.stringify(body),
+		});
+
+		if (response.status >= 400) {
+			throw new Error(`Blinko API error: ${response.status} ${response.text}`);
+		}
+
+		const payload = this.parseJson(response);
+		const notes = this.extractNotes(payload);
+		return notes;
+	}
+
+	async getArchivedNotes(_since: number, page: number, size: number): Promise<BlinkoNote[]> {
+		const url = this.buildUrl('/v1/note/list');
+		const body: NoteListParams = {
+			page,
+			size,
+			orderBy: 'desc',
+			isRecycle: false,
+			type: -1,
+			isArchived: true,
 		};
 
 		const response = await requestUrl({

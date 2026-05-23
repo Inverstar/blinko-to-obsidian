@@ -20,6 +20,7 @@ export interface BlinkoSettings {
 	aiConcurrency: number;  // 并发数
 	aiMaxTokens: number;    // 生成最大长度
 	lastSyncTime: number;
+	lastArchivedSyncTime: number;
 	autoSyncInterval: number; // minutes, 0 disabled
 	debugMode: boolean;
 	includeFrontmatterTags: boolean;
@@ -51,6 +52,7 @@ export const DEFAULT_SETTINGS: BlinkoSettings = {
 	aiConcurrency: 3,
 	aiMaxTokens: 50,
 	lastSyncTime: 0,
+	lastArchivedSyncTime: 0,
 	autoSyncInterval: 30,
 	debugMode: false,
 	includeFrontmatterTags: true,
