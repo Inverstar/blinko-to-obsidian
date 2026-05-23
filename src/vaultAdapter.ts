@@ -111,6 +111,8 @@ export class VaultAdapter {
 			'source: blinko',
 			`blinkoType: ${this.mapType(note.type)}`,
 			`blinkoTypeCode: ${typeof note.type === 'number' ? note.type : 0}`,
+			`isArchived: ${note.isArchived ? 'true' : 'false'}`,
+			`isRecycle: ${note.isRecycle ? 'true' : 'false'}`,	
 			`blinkoAttachments: [${attachments.map(this.quoteAttachment).join(', ')}]`,
 		];
 

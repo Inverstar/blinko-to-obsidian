@@ -71,6 +71,32 @@ export class BlinkoClient {
 		return notes;
 	}
 
+	async getRecycleNotes(_since: number, page: number, size: number): Promise<BlinkoNote[]> {
+		const url = this.buildUrl('/v1/note/list');
+		const body: NoteListParams = {
+			page,
+			size,
+			orderBy: 'desc',
+			isRecycle: true,
+			type: -1,
+		};
+
+		const response = await requestUrl({
+			url,
+			method: 'POST',
+			headers: this.buildHeaders(true),
+			body: JSON.stringify(body),
+		});
+
+		if (response.status >= 400) {
+			throw new Error(`Blinko API error: ${response.status} ${response.text}`);
+		}
+
+		const payload = this.parseJson(response);
+		const notes = this.extractNotes(payload);
+		return notes;
+	}
+
 	async getNotesByIds(ids: number[]): Promise<BlinkoNote[]> {
 		if (!ids.length) {
 			return [];

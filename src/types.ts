@@ -21,6 +21,7 @@ export interface BlinkoNote {
 	createdAt: string;
 	updatedAt: string;
 	isRecycle?: boolean;
+	isArchived?: boolean;
 	tags?: BlinkoTag[];
 	attachments?: BlinkoAttachment[];
 }

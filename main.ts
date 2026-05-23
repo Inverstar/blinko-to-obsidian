@@ -101,6 +101,34 @@ export default class BlinkoSyncPlugin extends Plugin {
 		}
 	}
 
+	async syncRecycleNow(manual = true) {
+		if (!this.syncManager) {
+			return;
+		}
+
+		if (this.syncManager.syncing) {
+			if (manual) {
+				new Notice('Blinko sync already running. Please wait.');
+			}
+			return;
+		}
+
+		this.setStatusSyncing();
+		try {
+			const { newNotes, flashNotes } = await this.syncManager.startSyncRecycle();
+			this.setStatusIdle(this.settings.lastSyncTime || undefined);
+			if (this.dailyNoteManager) {
+				await this.dailyNoteManager.insertFlashNotes(flashNotes);
+			}
+			new Notice(`Recycle sync complete: ${newNotes} recycle notes added.`);
+		} catch (error) {
+			this.setStatusIdle();
+			const reason = error instanceof Error ? error.message : 'Unknown error';
+			console.error('[Blinko Sync] Recycle sync failed', error);
+			new Notice(`Recycle sync failed: ${reason}`);
+		}
+	}
+
 	async checkDeletedNotes(manual = true) {
 		if (!this.deletionManager) {
 			return;
@@ -207,6 +235,14 @@ export default class BlinkoSyncPlugin extends Plugin {
 				name: 'Sync archived notes',
 				callback: () => {
 					void this.syncArchivedNow(true);
+				},
+			});
+
+			this.addCommand({
+				id: 'blinko-sync-recycle',
+				name: 'Sync recycle notes',
+				callback: () => {
+					void this.syncRecycleNow(true);
 				},
 			});
 
@@ -510,6 +546,32 @@ class BlinkoSettingTab extends PluginSettingTab {
 						void this.plugin.syncArchivedNow(true);
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName('Last recycle sync time')
+			.setDesc(this.getLastRecycleSyncDescription())
+			.addExtraButton((button) =>
+				button
+					.setIcon('rotate-ccw')
+					.setTooltip('Reset last recycle sync time')
+					.onClick(async () => {
+						this.plugin.settings.lastRecycleSyncTime = 0;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Sync recycle notes')
+			.setDesc('Sync recycle bin notes from Blinko')
+			.addButton((button) =>
+				button
+					.setButtonText('Sync recycle notes')
+					.setCta()
+					.onClick(() => {
+						void this.plugin.syncRecycleNow(true);
+					}),
+			);
 	}
 
 	private renderAiTitleSettings(containerEl: HTMLElement) {
@@ -771,5 +833,13 @@ class BlinkoSettingTab extends PluginSettingTab {
 		}
 
 		return new Date(this.plugin.settings.lastArchivedSyncTime).toLocaleString();
+	}
+
+	private getLastRecycleSyncDescription() {
+		if (!this.plugin.settings.lastRecycleSyncTime) {
+			return 'Never synced';
+		}
+
+		return new Date(this.plugin.settings.lastRecycleSyncTime).toLocaleString();
 	}
 }
